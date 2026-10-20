@@ -1,0 +1,17 @@
+# Local app data (your roster and cached NBA data)
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# uv / virtual environment
+.venv/
+
+# Streamlit local secrets (only if you ever add any)
+.streamlit/secrets.toml
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

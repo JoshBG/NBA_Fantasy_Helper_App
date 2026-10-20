@@ -1,0 +1,10 @@
+[project]
+name = "nba-fantasy-helper-app"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "nba-api>=1.11.4",
+    "pandas>=3.0.6",
+    "requests>=2.34.2",
+    "streamlit>=1.66.0",
+]
