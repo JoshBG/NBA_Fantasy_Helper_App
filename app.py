@@ -109,7 +109,7 @@ def load_schedule(force=False):
 def read_state():
     if ROSTER_FILE.exists():
         return json.loads(ROSTER_FILE.read_text())
-    return {"roster": [], "lineup": {}, "out": {}}
+    return {"roster": [], "lineup": {}, "overrides": {}}
 
 def write_state(s):
     ROSTER_FILE.write_text(json.dumps(s, indent=2))
@@ -132,6 +132,9 @@ def pct(made, att):
 # ---------- UI ----------
 st.set_page_config(page_title="Fantasy NBA Lineup", layout="wide")
 state = read_state()
+state.setdefault("overrides", {})
+for old_wk, old_ids in state.pop("out", {}).items():  # migrate old "out" flags to 0-game overrides
+    state["overrides"].setdefault(old_wk, {}).update({str(i): 0 for i in old_ids})
 
 with st.sidebar:
     st.header("Settings")
@@ -200,20 +203,39 @@ with tab_week:
         st.stop()
 
     wk = week.isoformat()
-    out_saved = [i for i in state["out"].get(wk, []) if i in ids]
-    out_ids = st.multiselect("Out this week (zeroes their games)", ids, default=out_saved, format_func=label)
-    if out_ids != out_saved:
-        state["out"] = {wk: out_ids}  # only keep the current week's flags
+    sched_info = {i: week_info(teams[i], sched, week) for i in ids}
+    saved = state["overrides"].get(wk, {})
+    edit_df = pd.DataFrame({
+        "Player": [names[i] for i in ids],
+        "Days": [", ".join(f"{d:%a}" for d in sched_info[i][0]) for i in ids],
+        "Scheduled": [len(sched_info[i][0]) for i in ids],
+        "B2B": [sched_info[i][1] for i in ids],
+        "Playing": [min(int(saved.get(str(i), len(sched_info[i][0]))), len(sched_info[i][0])) for i in ids],
+    }, index=ids)
+    st.subheader("Games this week")
+    st.caption("Edit **Playing** to adjust a player's expected games (0 = out). Saved for this week only.")
+    edited = st.data_editor(
+        edit_df, hide_index=True, use_container_width=True, key=f"games_{wk}",
+        disabled=["Player", "Days", "Scheduled", "B2B"],
+        column_config={"Playing": st.column_config.NumberColumn(min_value=0, max_value=7, step=1)})
+    playing = {i: int(min(max(v, 0), edit_df.loc[i, "Scheduled"])) if pd.notna(v) else int(edit_df.loc[i, "Scheduled"])
+               for i, v in edited["Playing"].items()}
+    new_over = {str(i): n for i, n in playing.items() if n != edit_df.loc[i, "Scheduled"]}
+    if new_over != saved:
+        state["overrides"][wk] = new_over
+        cutoff = (today - timedelta(14)).isoformat()  # drop old weeks
+        state["overrides"] = {k: v for k, v in state["overrides"].items() if k >= cutoff and v}
         write_state(state)
 
     rows = []
     for i in ids:
-        games, b2b = week_info(teams[i], sched, week)
-        out = i in out_ids
-        n, b = (0, 0) if out else (len(games), b2b)
+        games, b2b = sched_info[i]
+        n = playing[i]
+        b = 0 if n == 0 else b2b  # B2B shows the scheduled value unless the player is out
+        days = ", ".join(f"{d:%a}" for d in games)
         s = stats.loc[i] if i in stats.index else None
         row = {"id": i, "Player": names[i], "Team": teams[i], "Pos": slots.get(i, ""), "Games": n, "B2B": b,
-               "Days": "OUT" if out else ", ".join(f"{d:%a}" for d in games),
+               "Days": "OUT" if n == 0 else days + (f" (playing {n})" if n < len(games) else ""),
                "GP": int(s["GP"]) if s is not None else 0}
         for c in COUNT + SHOOT:
             row[c] = (s[c] if s is not None else 0.0) * n
