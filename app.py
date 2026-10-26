@@ -61,9 +61,22 @@ def load_positions(force=False):
     df = pd.read_csv(p).fillna("")
     return {i: SLOT_MAP.get(x, x) for i, x in zip(df["id"], df["pos"])}
 
+STATS_MODES = {"Last season": (LAST_SEASON, 0), "Last 10 games": (SEASON, 10), "This season": (SEASON, 0)}
+
+def stats_path(mode):
+    season, last_n = STATS_MODES[mode]
+    return DATA / f"stats_v2_{season}_{last_n}.csv"
+
+def pulled(path):
+    """When the cache file was last written, i.e. when the app last pulled that data."""
+    if not path.exists():
+        return "Not yet pulled"
+    dt = datetime.fromtimestamp(path.stat().st_mtime)
+    return f"{dt:%b} {dt.day}, {dt.hour % 12 or 12}:{dt:%M} {dt:%p}"
+
 def load_stats(mode, force=False):
-    season, last_n = {"Last season": (LAST_SEASON, 0), "Last 10 games": (SEASON, 10), "This season": (SEASON, 0)}[mode]
-    p = DATA / f"stats_v2_{season}_{last_n}.csv"
+    season, last_n = STATS_MODES[mode]
+    p = stats_path(mode)
     if force or not fresh(p, None if season == LAST_SEASON else 12):
         df = retry(lambda: leaguedashplayerstats.LeagueDashPlayerStats(
             season=season, per_mode_detailed="PerGame", last_n_games=last_n, timeout=60).get_data_frames()[0])
@@ -148,6 +161,14 @@ except Exception as e:
     st.stop()
 
 slots = load_positions()
+
+with st.sidebar:  # drawn after loading so first-run pulls show up immediately
+    st.subheader("Data last pulled")
+    sched_path = DATA / f"schedule_{SEASON}.json"
+    st.caption(f"Player stats ({mode}): {pulled(stats_path(mode))}")
+    st.caption(f"Schedule: {pulled(sched_path)}")
+    st.caption(f"Player list: {pulled(DATA / 'players.csv')}")
+    st.caption(f"Positions: {pulled(DATA / 'positions.csv')}")
 
 if stats.empty:
     st.warning(f"No stats yet for '{mode}'. Try 'Last season'.")

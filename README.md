@@ -13,6 +13,7 @@ A local Streamlit app for setting weekly fantasy NBA lineups in a category leagu
 - Team total for your six starters: summed counting stats, with FG% and FT% from combined makes and attempts
 - Mark players out for the week (zeroes their games)
 - Toggle averages between this season, last 10 games, and last season
+- Sidebar shows when each data source (stats, schedule, player list, positions) was last pulled
 - Likely lineup slots shown next to each player (approximate, based on NBA.com positions)
 
 ## Setup
@@ -41,7 +42,7 @@ Streamlit opens the app in your browser (default: http://localhost:8501).
    - Mark any injured players under "Out this week".
    - Assign players to the six lineup slots.
    - Read the starters table (with a team total row) and the full-roster table below.
-3. Click **Refresh data from NBA** in the sidebar to re-pull players, schedule, and stats.
+3. Click **Refresh data from NBA** in the sidebar to re-pull players, schedule, and stats. The "Data last pulled" section in the sidebar shows when each source was last fetched (it reflects your app's last pull, not when the NBA updated its data).
 
 ## Data
 
